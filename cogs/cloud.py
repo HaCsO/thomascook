@@ -25,7 +25,7 @@ class CloudCommands(commands.Cog):
 	@is_approved_channel()
 	@commands.slash_command()
 	async def model(self, ctx, sim: discord.Option(name= "simulator", choises=sim_types, autocomplete= autocomplete_sims), plane: discord.Option(name="plane", input_type=str)):
-		with open(os.getcwd() + "/links.json", "r") as f:
+		with open("/root/thomascook/links.json", "r") as f:
 			data = json.load(f)
 		try:
 			await ctx.respond(f"Симулятор: {sim}\nМодель: {plane}\nСсылка: {data['model'][sim][plane]}")
@@ -35,7 +35,7 @@ class CloudCommands(commands.Cog):
 	@is_approved_channel()
 	@commands.slash_command()
 	async def scenery(self, ctx, sim: discord.Option(name= "simulator", choises=sim_types, autocomplete= autocomplete_sims), plane: discord.Option(name="plane", input_type=str)):
-		with open(os.getcwd() + "/links.json", "r") as f:
+		with open("/root/thomascook/links.json", "r") as f:
 			data = json.load(f)
 		try:
 			await ctx.respond(f"Симулятор: {sim}\nМодель: {plane}\nСсылка: {data['scenery'][sim][plane]}")
