@@ -6,7 +6,8 @@ bot = commands.Bot(command_prefix="!", intents= discord.Intents.default(), debug
 
 cogs = [
 	"cogs.events",
-	"cogs.cloud"
+	"cogs.cloud",
+	"cogs.stats"
 ]
 for i in cogs:
 	bot.load_extension(i)
