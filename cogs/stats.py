@@ -7,7 +7,7 @@ import json
 from datetime import timedelta, datetime
 
 class Statistics(commands.Cog):
-	stats_channel = 798224036977967126
+	stats_channel = 866564068603854848
 	stats_len = 4
 	def __init__(self, bot):
 		self.bot = bot
