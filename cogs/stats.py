@@ -4,13 +4,14 @@ import discord
 from discord.ext import commands, tasks
 import os
 import json
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 class Statistics(commands.Cog):
 	stats_channel = 798224036977967126
+	stats_len = 4
 	def __init__(self, bot):
 		self.bot = bot
-		
+
 	@commands.Cog.listener()
 	async def on_ready(self):
 		self.statistics_update.start()
@@ -27,16 +28,16 @@ class Statistics(commands.Cog):
 
 	@tasks.loop(hours=1)
 	async def statistics_update(self):
+		await self.bot.change_presence(activity=discord.Game(name="статистику"), status=discord.Status.dnd)
 		cache = self.check_cached_msgs()
 		if not cache:
 			await self.send_stat_msgs()
-			return
-		if len(cache.keys()) < 3:
+		elif len(cache.keys()) < self.stats_len:
 			await self.delete_messages(cache)
 			await self.send_stat_msgs()
-			return
-		
-		await self.update_messages(cache)
+		else:
+			await self.update_messages(cache)
+		await self.bot.change_presence(activity=WatchingAct())
 
 	async def delete_messages(self, cache):
 		for i in cache.values():
@@ -45,40 +46,45 @@ class Statistics(commands.Cog):
 
 		await self.purge_cache()
 
+	def format_desc(self, lst, formatter):
+		return "\n".join([f"{place}. {flighter.username} = **{formatter(val)}**" for place, (flighter, val) in enumerate(lst.items(), 1)])
+
+	async def _update_message(self, msg_id, lst, formatter):
+		msg = await self.bot.get_channel(self.stats_channel).fetch_message(msg_id)
+		emb = msg.embeds[0]
+		emb.description = self.format_desc(lst, formatter)
+		dtformat = datetime.now()
+		dtformat = dtformat.strftime("%Y.%m.%d %H:%M")
+		emb.set_footer(text=f"Последнее обновление: {dtformat}")
+		await msg.edit(embed = emb)
+
 	async def update_messages(self, cache):
 		f = FlightCompany("Thomas Cook Airlines")
-		amount, miles, time = f.get_all_tops_formated()
-		msg = await self.bot.get_channel(self.stats_channel).fetch_message(cache["amount"])
-		emb = msg.embeds[0]
-		emb.description = "\n".join([f"{place}. {flighter.username} = **{val}**" for place, (flighter, val) in enumerate(amount.items(), 1)])
-		await msg.edit(embed = emb)
-		msg = await self.bot.get_channel(self.stats_channel).fetch_message(cache["miles"])
-		emb = msg.embeds[0]
-		emb.description = "\n".join([f"{place}. {flighter.username} = **{val} nM**" for place, (flighter, val) in enumerate(miles.items(), 1)])
-		await msg.edit(embed = emb)
-		msg = await self.bot.get_channel(self.stats_channel).fetch_message(cache["time"])
-		emb = msg.embeds[0]
-		emb.description = "\n".join([f"{place}. {flighter.username} = **{strfdelta(timedelta(seconds=val), '{H}h:{M}m:{S}s')}**" for place, (flighter, val) in enumerate(time.items(), 1)])
-		await msg.edit(embed = emb)
+		amount, miles, time, rating = f.get_all_tops_formated()
+
+		await self._update_message(cache["amount"], amount, lambda x: x)
+		await self._update_message(cache["miles"], miles, lambda x: f"{x} nM")
+		await self._update_message(cache["time"], time, lambda x: f"{strfdelta(timedelta(seconds=x), '{H}h:{M}m:{S}s')}")
+		await self._update_message(cache["rating"], rating, lambda x: x)
+
+	async def _send_stat_msgs_and_cache(self, channel, name, title, lst, formatter):
+		emb = discord.Embed(title=title, description= self.format_desc(lst, formatter), color=discord.Color.orange())
+		dtformat = datetime.now()
+		dtformat = dtformat.strftime("%Y.%m.%d %H:%M")
+		emb.set_footer(text=f"Последнее обновление: {dtformat}")
+		self.write_cache(name, (await channel.send(embed=emb)).id)
 
 	async def send_stat_msgs(self):
 		f = FlightCompany("Thomas Cook Airlines")
-		amount, miles, time = f.get_all_tops_formated()
+		amount, miles, time, rating = f.get_all_tops_formated()
 		chan = self.bot.get_channel(self.stats_channel)
 		if not chan:
 			return False
-		emb = discord.Embed(title="Топ по количеству полётов", description= "\n".join(
-			[f"{place}. {flighter.username} = **{val}**" for place, (flighter, val) in enumerate(amount.items(), 1)]
-			), color=discord.Color.orange())
-		self.write_cache("amount", (await chan.send(embed=emb)).id)
-		emb = discord.Embed(title="Топ по количеству пройденного расстояния", description= "\n".join(
-			[f"{place}. {flighter.username} = **{val} nM**" for place, (flighter, val) in enumerate(miles.items(), 1)]
-			), color=discord.Color.orange())
-		self.write_cache("miles", (await chan.send(embed=emb)).id)
-		emb = discord.Embed(title="Топ по общему времени полёта", description= "\n".join(
-			[f"{place}. {flighter.username} = **{strfdelta(timedelta(seconds=val), '{H}h:{M}m:{S}s')}**" for place, (flighter, val) in enumerate(time.items(), 1)]
-			), color=discord.Color.orange())
-		self.write_cache("time", (await chan.send(embed=emb)).id)
+
+		await self._send_stat_msgs_and_cache(chan, "amount", "Топ по количеству полётов", amount, lambda x: x)
+		await self._send_stat_msgs_and_cache(chan, "miles", "Топ по количеству пройденного расстояния", miles, lambda x: f"{x} nM")
+		await self._send_stat_msgs_and_cache(chan, "time", "Топ по общему времени полёта", time, lambda x: f"{strfdelta(timedelta(seconds=x), '{H}h:{M}m:{S}s')}")
+		await self._send_stat_msgs_and_cache(chan, "rating", "Топ полётного рейтинга", rating, lambda x: x)
 
 	def check_cached_msgs(self):
 		cache = None
