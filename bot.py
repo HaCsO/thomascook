@@ -12,5 +12,5 @@ cogs = [
 for i in cogs:
 	bot.load_extension(i)
 cfg = configparser.ConfigParser()
-cfg.read("./config.cfg")
+cfg.read("/root/thomascook/config.cfg")
 bot.run(cfg["GENERAL"]["token"])

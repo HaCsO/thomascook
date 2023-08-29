@@ -89,7 +89,7 @@ class Statistics(commands.Cog):
 	def check_cached_msgs(self):
 		cache = None
 		try:
-			with open(os.getcwd() + "/cache.json", "r") as f:
+			with open("/root/thomascook/cache.json", "r") as f:
 				cache = json.load(f)
 		except:
 			return False
@@ -98,11 +98,11 @@ class Statistics(commands.Cog):
 	def write_cache(self, topname, message_id):
 		msg = self.check_cached_msgs() or {}
 		msg[topname] = message_id
-		with open(os.getcwd() + "/cache.json", "w") as f:
+		with open("/root/thomascook/cache.json", "w") as f:
 			json.dump(msg, f)
 
 	def purge_cache(self):
-		with open(os.getcwd() + "/cache.json", "w") as f:
+		with open("/root/thomascook/cache.json", "w") as f:
 			json.dump({}, f)
 
 def setup(bot):
