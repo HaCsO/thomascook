@@ -48,7 +48,7 @@ class FlightCompany(VirtAirLinesStatistics):
 		assert name != None
 		members_dict = {}
 		for member in members:
-			members_dict[member] = int(member.general_table[typeofsort]["text"])
+			members_dict[member] = int(float(member.general_table[typeofsort]["text"]))
 
 		return {k: v for k, v in sorted(members_dict.items(), key=lambda item: item[1], reverse=True)}
 	
@@ -61,13 +61,17 @@ class FlightCompany(VirtAirLinesStatistics):
 	def get_top_by_time(self, name= None, members = None):
 		return self.get_top_by_of("Часы налёта:", name, members)
 
+	def get_top_by_rating(self, name= None, members = None):
+		return self.get_top_by_of("Полётный рейтинг:", name, members)
+
 	def get_all_tops_formated(self, name = None):
 		members = self.get_all_members_obj()
 		top_by_amount = self.get_top_by_amount(members = members)
 		top_by_miles = self.get_top_by_miles(members= members)
 		top_by_time = self.get_top_by_time(members= members)
+		top_by_rating = self.get_top_by_rating(members= members)
 
-		return top_by_amount, top_by_miles, top_by_time
+		return top_by_amount, top_by_miles, top_by_time, top_by_rating
 
 class Flighter(VirtAirLinesStatistics):
 	def __init__(self, name):

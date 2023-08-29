@@ -1,6 +1,6 @@
 from discord.ext import commands
 from string import Formatter
-from datetime import timedelta
+import discord
 
 channel_list = [
     867298168492261376,
@@ -39,3 +39,7 @@ def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelt
         if field in desired_fields and field in constants:
             values[field], remainder = divmod(remainder, constants[field])
     return f.format(fmt, **values)
+
+class WatchingAct(discord.BaseActivity):
+    def to_dict(self) -> discord.Activity:
+        return {"type": 3, "name": "прямо в душу"}
