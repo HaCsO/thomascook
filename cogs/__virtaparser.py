@@ -1,7 +1,8 @@
 import aiohttp
 from bs4 import BeautifulSoup
 from configparser import ConfigParser
-cfg = ConfigParser("./config.cfg")
+cfg = ConfigParser()
+cfg.read("./config.cfg")
 
 class VirtAirLinesStatistics(object):
 	def __init__(self):

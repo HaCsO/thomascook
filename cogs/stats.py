@@ -21,7 +21,7 @@ class Statistics(commands.Cog):
 	async def profile(self, ctx, name):
 		prf = Flighter(name)
 		try:
-			prf.update_user()
+			await prf.update_user()
 		except:
 			await ctx.respond("Указанный пользователь не найден!")
 		await ctx.respond(prf.account_card_image)
@@ -60,7 +60,7 @@ class Statistics(commands.Cog):
 
 	async def update_messages(self, cache):
 		f = FlightCompany("Thomas Cook Airlines")
-		amount, miles, time, rating = f.get_all_tops_formated()
+		amount, miles, time, rating = await f.get_all_tops_formated()
 
 		await self._update_message(cache["amount"], amount, lambda x: x)
 		await self._update_message(cache["miles"], miles, lambda x: f"{x} nM")
@@ -76,7 +76,7 @@ class Statistics(commands.Cog):
 
 	async def send_stat_msgs(self):
 		f = FlightCompany("Thomas Cook Airlines")
-		amount, miles, time, rating = f.get_all_tops_formated()
+		amount, miles, time, rating = await f.get_all_tops_formated()
 		chan = self.bot.get_channel(self.stats_channel)
 		if not chan:
 			return False
