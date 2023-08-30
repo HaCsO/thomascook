@@ -1,2 +1,4 @@
 config.cfg
 *.json
+*.db
+*.db-journal
