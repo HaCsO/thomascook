@@ -39,7 +39,7 @@ class Statistics(commands.Cog):
 		f = FlightCompany(self.cmpname)
 		balance = int((await f.get_balance())[:-2].replace(".", ""))
 		rep = float(await f.get_rax_rep())
-		db = sqlite3.connect("./statistics.db")
+		db = sqlite3.connect("/root/thomascook/statistics.db")
 		cur = db.cursor()
 		timestamp = datetime.now().timestamp()
 		cur.execute(f"INSERT INTO balance VALUES ({timestamp}, {balance})")
@@ -124,7 +124,7 @@ class Statistics(commands.Cog):
 		self.write_cache("rating_graf", msg.id)
 
 	async def get_plot_image(self, tablename: str, lehend_label = None):
-		db = sqlite3.connect("./statistics.db")
+		db = sqlite3.connect("/root/thomascook/statistics.db")
 		cur = db.cursor()
 		cur.execute(f"SELECT * FROM {tablename} ORDER BY dt ASC LIMIT 30")
 		data = cur.fetchall()
