@@ -5,15 +5,23 @@ from discord.ext import commands, tasks
 import os
 import json
 from datetime import timedelta, datetime
+import sqlite3
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import io
+import numpy
+import matplotlib.dates as mdates
 
 class Statistics(commands.Cog):
 	stats_channel = 866564068603854848
-	stats_len = 4
+	stats_len = 6
 	def __init__(self, bot):
 		self.bot = bot
+		self.cmpname = "Thomas Cook Airlines"
 
 	@commands.Cog.listener()
 	async def on_ready(self):
+		self.grep_statistics.start()
 		self.statistics_update.start()
 
 	@is_approved_channel()
@@ -21,10 +29,24 @@ class Statistics(commands.Cog):
 	async def profile(self, ctx, name):
 		prf = Flighter(name)
 		try:
-			prf.update_user()
+			await prf.update_user()
 		except:
 			await ctx.respond("Указанный пользователь не найден!")
 		await ctx.respond(prf.account_card_image)
+
+	@tasks.loop(hours=24)
+	async def grep_statistics(self):
+		f = FlightCompany(self.cmpname)
+		balance = int((await f.get_balance())[:-2].replace(".", ""))
+		rep = float(await f.get_rax_rep())
+		db = sqlite3.connect("./statistics.db")
+		cur = db.cursor()
+		timestamp = datetime.now().timestamp()
+		cur.execute(f"INSERT INTO balance VALUES ({timestamp}, {balance})")
+		cur.execute(f"INSERT INTO rating VALUES ({timestamp}, {rep})")
+		cur.close()
+		db.commit()
+		db.close()
 
 	@tasks.loop(hours=1)
 	async def statistics_update(self):
@@ -36,15 +58,23 @@ class Statistics(commands.Cog):
 			await self.delete_messages(cache)
 			await self.send_stat_msgs()
 		else:
-			await self.update_messages(cache)
+			try:
+				await self.update_messages(cache)
+			except:
+				self.purge_cache()
+				await self.send_stat_msgs()
+
 		await self.bot.change_presence(activity=WatchingAct())
 
 	async def delete_messages(self, cache):
 		for i in cache.values():
-			msg = await self.bot.get_channel(self.stats_channel).fetch_message(i)
-			await msg.delete()
+			try:
+				msg = await self.bot.get_channel(self.stats_channel).fetch_message(i)
+				await msg.delete()
+			except:
+				continue
 
-		await self.purge_cache()
+		self.purge_cache()
 
 	def format_desc(self, lst, formatter):
 		return "\n".join([f"{place}. {flighter.username} = **{formatter(val)}**" for place, (flighter, val) in enumerate(lst.items(), 1)])
@@ -59,13 +89,16 @@ class Statistics(commands.Cog):
 		await msg.edit(embed = emb)
 
 	async def update_messages(self, cache):
-		f = FlightCompany("Thomas Cook Airlines")
-		amount, miles, time, rating = f.get_all_tops_formated()
+		f = FlightCompany(self.cmpname)
+		amount, miles, time, rating = await f.get_all_tops_formated()
 
 		await self._update_message(cache["amount"], amount, lambda x: x)
 		await self._update_message(cache["miles"], miles, lambda x: f"{x} nM")
 		await self._update_message(cache["time"], time, lambda x: f"{strfdelta(timedelta(seconds=x), '{H}h:{M}m:{S}s')}")
 		await self._update_message(cache["rating"], rating, lambda x: x)
+		await (await self.bot.get_channel(self.stats_channel).fetch_message(cache["balance_graf"])).edit(attachments= [], file= await self.get_plot_image("balance", "Тугрики"))
+		await (await self.bot.get_channel(self.stats_channel).fetch_message(cache["rating_graf"])).edit(attachments= [], file = await self.get_plot_image("rating", "Рерутация"))
+
 
 	async def _send_stat_msgs_and_cache(self, channel, name, title, lst, formatter):
 		emb = discord.Embed(title=title, description= self.format_desc(lst, formatter), color=discord.Color.orange())
@@ -75,8 +108,8 @@ class Statistics(commands.Cog):
 		self.write_cache(name, (await channel.send(embed=emb)).id)
 
 	async def send_stat_msgs(self):
-		f = FlightCompany("Thomas Cook Airlines")
-		amount, miles, time, rating = f.get_all_tops_formated()
+		f = FlightCompany(self.cmpname)
+		amount, miles, time, rating = await f.get_all_tops_formated()
 		chan = self.bot.get_channel(self.stats_channel)
 		if not chan:
 			return False
@@ -85,6 +118,36 @@ class Statistics(commands.Cog):
 		await self._send_stat_msgs_and_cache(chan, "miles", "Топ по количеству пройденного расстояния", miles, lambda x: f"{x} nM")
 		await self._send_stat_msgs_and_cache(chan, "time", "Топ по общему времени полёта", time, lambda x: f"{strfdelta(timedelta(seconds=x), '{H}h:{M}m:{S}s')}")
 		await self._send_stat_msgs_and_cache(chan, "rating", "Топ полётного рейтинга", rating, lambda x: x)
+		msg = await chan.send(file= await self.get_plot_image("balance", "Тугрики"))
+		self.write_cache("balance_graf", msg.id)
+		msg = await chan.send(file= await self.get_plot_image("rating", "Репутация"))
+		self.write_cache("rating_graf", msg.id)
+
+	async def get_plot_image(self, tablename: str, lehend_label = None):
+		db = sqlite3.connect("./statistics.db")
+		cur = db.cursor()
+		cur.execute(f"SELECT * FROM {tablename} ORDER BY dt ASC LIMIT 30")
+		data = cur.fetchall()
+		cur.close()
+		db.close()
+		
+		fig, ax = plt.subplots(constrained_layout=True)
+		fig.set_size_inches(18.5, 5.5)
+		ax.set_title(f"Статистика значения: {tablename}")
+		ax.set_xlabel("Date")
+		ax.set_ylabel(tablename.capitalize())
+		ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
+
+		x, y = map(list,zip(*data))
+		dates = [datetime.fromtimestamp(float(i)).strftime("%m.%d") for i in x]
+
+		ax.plot(dates, y, label=lehend_label)
+		ax.legend()
+
+		buff = io.BytesIO()
+		fig.savefig(buff, format="png", dpi=200)
+		buff.seek(0)
+		return discord.File(buff, filename="statistics.png")
 
 	def check_cached_msgs(self):
 		cache = None
