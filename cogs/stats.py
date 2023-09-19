@@ -126,7 +126,7 @@ class Statistics(commands.Cog):
 	async def get_plot_image(self, tablename: str, lehend_label = None):
 		db = sqlite3.connect("/root/thomascook/statistics.db")
 		cur = db.cursor()
-		cur.execute(f"SELECT * FROM {tablename} ORDER BY dt ASC LIMIT 30")
+		cur.execute(f"SELECT * FROM {tablename} ORDER BY dt DESC LIMIT 30")
 		data = cur.fetchall()
 		cur.close()
 		db.close()
@@ -138,6 +138,7 @@ class Statistics(commands.Cog):
 		ax.set_ylabel(tablename.capitalize())
 		ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 
+		data = list(reversed(data))
 		x, y = map(list,zip(*data))
 		dates = [datetime.fromtimestamp(float(i)).strftime("%m.%d") for i in x]
 
