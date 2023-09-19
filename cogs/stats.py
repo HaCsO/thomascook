@@ -148,6 +148,7 @@ class Statistics(commands.Cog):
 		buff = io.BytesIO()
 		fig.savefig(buff, format="png", dpi=200)
 		buff.seek(0)
+		plt.close(fig)
 		return discord.File(buff, filename="statistics.png")
 
 	def check_cached_msgs(self):
