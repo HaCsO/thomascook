@@ -1,18 +1,20 @@
 import aiohttp
 from bs4 import BeautifulSoup
 from configparser import ConfigParser
+from .__utils import Table
 cfg = ConfigParser()
 cfg.read("./config.cfg")
 
 class VirtAirLinesStatistics(object):
 	def __init__(self):
-		self.domain = "http://www.virtairlines.ru/"
+		self.domain = "https://virtairlines.ru/"
 		self.login_params_template = {
 			"email": cfg["virtairlines"]["login"],
 			"pass": cfg["virtairlines"]["pass"],
 			"blue": "Войти",
 			"send_action": "login"
 		}
+		self.auth_header = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"} # Автор сайта ебаная девочка которая боится парса
 
 	async def get_data(self, address, given_session = None, login=False):
 		if not given_session:
@@ -20,8 +22,9 @@ class VirtAirLinesStatistics(object):
 		else:
 			session = given_session
 
+		# authorization
 		if login:
-			await session.post(self.domain, data= self.login_params_template)
+			await session.post(self.domain, headers=self.auth_header, data= self.login_params_template)
 
 		async with session.get(f"{self.domain}{address}") as data:
 			bs = BeautifulSoup(await data.text(), "html.parser")
@@ -35,7 +38,12 @@ class FlightCompany(VirtAirLinesStatistics):
 		super().__init__()
 		self.name = name
 
-
+	async def get_guild_rating(self):
+		soup = await self.get_data("statistics", login=True)
+		strs = soup.find_all("table", {"id": "tablica"})[0].find_all("tr")[1:-1]
+		table = Table(self.name)
+		table.parse_trs(strs)
+		return table
 
 	async def get_main_info_table(self, name = None):
 		if not name:
@@ -50,7 +58,6 @@ class FlightCompany(VirtAirLinesStatistics):
 
 	async def get_rax_rep(self, name = None):
 		return (await self.get_main_info_table(name)).find_all("tr")[7].contents[3].text
-
 
 	async def get_all_members(self, name = None):
 		if not name:

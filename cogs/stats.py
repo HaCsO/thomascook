@@ -13,8 +13,8 @@ import numpy
 import matplotlib.dates as mdates
 
 class Statistics(commands.Cog):
-	stats_channel = 798224036977967126
-	stats_len = 6
+	stats_channel = 866564068603854848
+	stats_len = 7
 	def __init__(self, bot):
 		self.bot = bot
 		self.cmpname = "Thomas Cook Airlines"
@@ -55,7 +55,8 @@ class Statistics(commands.Cog):
 		if not cache:
 			await self.send_stat_msgs()
 		elif len(cache.keys()) < self.stats_len:
-			await self.delete_messages(cache)
+			# await self.delete_messages(cache)
+			await self.bot.get_channel(self.stats_channel).purge(limit=self.stats_len)
 			await self.send_stat_msgs()
 		else:
 			try:
@@ -76,13 +77,19 @@ class Statistics(commands.Cog):
 
 		self.purge_cache()
 
+	def rating_format(self, lst, _):
+		guild_rating, upguild, downguild = lst[0], lst[1], lst[2]
+		return f"Позиция: **{guild_rating.number}**\nКоличество очков: **{guild_rating.points}**\nОтставание от `{upguild.name}`: **{round(upguild.points - guild_rating.points)}**\nОтрыв от `{downguild.name}`: **{round(guild_rating.points - downguild.points)}**"
+
 	def format_desc(self, lst, formatter):
 		return "\n".join([f"{place}. {flighter.username} = **{formatter(val)}**" for place, (flighter, val) in enumerate(lst.items(), 1)])
 
-	async def _update_message(self, msg_id, lst, formatter):
+	async def _update_message(self, msg_id, lst, formatter, _form = None):
+		if not _form:
+			_form = self.format_desc
 		msg = await self.bot.get_channel(self.stats_channel).fetch_message(msg_id)
 		emb = msg.embeds[0]
-		emb.description = self.format_desc(lst, formatter)
+		emb.description = _form(lst, formatter)
 		dtformat = datetime.now()
 		dtformat = dtformat.strftime("%Y.%m.%d %H:%M")
 		emb.set_footer(text=f"Последнее обновление: {dtformat}")
@@ -91,7 +98,12 @@ class Statistics(commands.Cog):
 	async def update_messages(self, cache):
 		f = FlightCompany(self.cmpname)
 		amount, miles, time, rating = await f.get_all_tops_formated()
-
+		guild = await f.get_guild_rating()
+		guild_rating = guild.strings[guild.cmp_index]
+		upguild = guild.strings[guild.cmp_index-1]
+		downguild = guild.strings[guild.cmp_index+1]
+		
+		await self._update_message(cache["guild_rating"], [guild_rating, upguild, downguild], None, self.rating_format)
 		await self._update_message(cache["amount"], amount, lambda x: x)
 		await self._update_message(cache["miles"], miles, lambda x: f"{x} nM")
 		await self._update_message(cache["time"], time, lambda x: f"{strfdelta(timedelta(seconds=x), '{H}h:{M}m:{S}s')}")
@@ -99,21 +111,39 @@ class Statistics(commands.Cog):
 		await (await self.bot.get_channel(self.stats_channel).fetch_message(cache["balance_graf"])).edit(attachments= [], file= await self.get_plot_image("balance", "Тугрики"))
 		await (await self.bot.get_channel(self.stats_channel).fetch_message(cache["rating_graf"])).edit(attachments= [], file = await self.get_plot_image("rating", "Рерутация"))
 
-
-	async def _send_stat_msgs_and_cache(self, channel, name, title, lst, formatter):
-		emb = discord.Embed(title=title, description= self.format_desc(lst, formatter), color=discord.Color.orange())
+	async def _send_stat_msgs_and_cache(self, channel, name, title, lst, formatter, _form = None):
+		if not _form:
+			_form = self.format_desc
+		emb = discord.Embed(title=title, description= _form(lst, formatter), color=discord.Color.orange())
 		dtformat = datetime.now()
 		dtformat = dtformat.strftime("%Y.%m.%d %H:%M")
 		emb.set_footer(text=f"Последнее обновление: {dtformat}")
 		self.write_cache(name, (await channel.send(embed=emb)).id)
 
+	# async def send_guild_rating(self, channel):
+	# 	guild = await self.get_guild_rating()
+	# 	guild_rating = guild.strings[guild.cmp_index]
+	# 	upguild = guild.strings[guild.cmp_index-1]
+	# 	downguild = guild.strings[guild.cmp_index+1]
+	# 	strr = f"Позиция: {guild_rating.number}\nКоличество очков:{guild_rating.points}\nОтставание от `{upguild.name}`: {upguild.points - guild_rating.points}\nОтрыв от `{downguild.name}`: {guild_rating.points - downguild.points}"
+	# 	emb = discord.Embed(title="ТОП в пассажирском рейтинге:", description= strr, color=discord.Color.orange())
+	# 	dtformat = datetime.now()
+	# 	dtformat = dtformat.strftime("%Y.%m.%d %H:%M")
+	# 	emb.set_footer(text=f"Последнее обновление: {dtformat}")
+	# 	self.write_cache("guild", (await channel.send(embed=emb)).id)
+
 	async def send_stat_msgs(self):
-		f = FlightCompany(self.cmpname)
-		amount, miles, time, rating = await f.get_all_tops_formated()
 		chan = self.bot.get_channel(self.stats_channel)
 		if not chan:
 			return False
-
+		f = FlightCompany(self.cmpname)
+		amount, miles, time, rating = await f.get_all_tops_formated()
+		guild = await f.get_guild_rating()
+		guild_rating = guild.strings[guild.cmp_index]
+		upguild = guild.strings[guild.cmp_index-1]
+		downguild = guild.strings[guild.cmp_index+1]
+		
+		await self._send_stat_msgs_and_cache(chan, "guild_rating", "Топ в пассажирском рейтинге:", [guild_rating, upguild, downguild], None, self.rating_format)
 		await self._send_stat_msgs_and_cache(chan, "amount", "Топ по количеству полётов", amount, lambda x: x)
 		await self._send_stat_msgs_and_cache(chan, "miles", "Топ по количеству пройденного расстояния", miles, lambda x: f"{x} nM")
 		await self._send_stat_msgs_and_cache(chan, "time", "Топ по общему времени полёта", time, lambda x: f"{strfdelta(timedelta(seconds=x), '{H}h:{M}m:{S}s')}")
